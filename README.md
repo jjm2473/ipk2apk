@@ -1,6 +1,11 @@
 # ipk2apk
 openwrt ipk to apk (WIP)
 
+# Config
+apk支持以下两个位置的软件源：`/etc/apk/repositories`, `/etc/apk/repositories.d/*.list`。
+
+apk支持root参数指定根目录`apk -root "/tmp/is-root"`，但是好像不支持单独指定index缓存目录。
+
 # Ref
 
 https://wiki.alpinelinux.org/wiki/Apk_spec
