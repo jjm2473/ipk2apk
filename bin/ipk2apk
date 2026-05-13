@@ -1,0 +1,152 @@
+#!/bin/bash
+
+APK_TOOL="$(which apk)"
+
+if [ ! -f "$APK_TOOL" ]; then
+    echo -e "\nThe apk command is not installed.\n"
+    exit 1
+fi
+
+show_help() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS] <FILE.ipk>... [OUTPUT_DIR]
+
+Arguments:
+  <FILE.ipk>...      One or more .ipk files to be converted.
+  [OUTPUT_DIR]       Target directory for .apk files (default: current dir).
+
+EOF
+}
+
+convert_one_ipk() {
+    local ipk_input="$1"
+    local output_dir="$2"
+
+    [ ! -f "$ipk_input" ] && { echo "Error: $ipk_input not found"; return 1; }
+
+    # setup paths and workspace
+    local abs_ipk=$(readlink -f "$ipk_input")
+    local abs_output_dir=$(readlink -f "$output_dir")
+    local tmp_dir=$(mktemp -d /tmp/ipk2apk.XXXXXX)
+    
+    echo "Processing: $(basename "$abs_ipk")"
+
+    pushd "$tmp_dir" > /dev/null || return 1
+
+    # unpack ipk
+    tar -xf "$abs_ipk" || { 
+        echo "Error: Failed to extract $(basename "$abs_ipk")"
+        popd > /dev/null; rm -rf "$tmp_dir"; return 1 
+    }
+
+    mkdir -p control_dir data_dir
+    [ -f "control.tar.gz" ] && tar -xzf control.tar.gz -C control_dir
+    [ -f "data.tar.gz" ] && tar -xzf data.tar.gz -C data_dir
+
+    local control_file="control_dir/control"
+    [ ! -f "$control_file" ] && { 
+        echo "Error: control metadata missing"; popd > /dev/null; rm -rf "$tmp_dir"; return 1 
+    }
+
+    # parse control fields
+    get_metadata() {
+        grep "^$1: " "$control_file" | cut -d' ' -f2-
+    }
+
+    local pkg_name=$(get_metadata "Package")
+    local pkg_version=$(get_metadata "Version")
+    local pkg_arch=$(get_metadata "Architecture")
+    local pkg_license=$(get_metadata "License")
+    local pkg_origin=$(get_metadata "Source")
+    local pkg_url=$(get_metadata "URL")
+    local pkg_maintainer=$(get_metadata "Maintainer")
+    local pkg_deps=$(get_metadata "Depends" | sed 's/,/ /g')
+    local pkg_provides=$(get_metadata "Provides")
+    [ -z "$pkg_provides" ] && pkg_provides="${pkg_name}-any"
+
+    local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
+    [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
+
+    # generate .list for apk package
+    local raw_list="$tmp_dir/files.list.txt"
+    pushd data_dir > /dev/null
+    (
+        find . -type f
+        find . -type l
+        find . -type d -empty
+    ) | sed 's|^\.||' | sed 's|/$||' | grep -v "^$" | sort -u > "$raw_list"
+    popd > /dev/null
+
+    local list_target_dir="data_dir/lib/apk/packages"
+    mkdir -p "$list_target_dir"
+    mv "$raw_list" "$list_target_dir/${pkg_name}.list"
+
+    # maintenance scripts mapping
+    local script_args=""
+    map_script() {
+        if [ -f "control_dir/$1" ]; then
+            chmod +x "control_dir/$1"
+            script_args="$script_args --script $2:$(readlink -f "control_dir/$1")"
+        fi
+    }
+
+    map_script "preinst" "pre-install"
+    map_script "postinst" "post-install"
+    map_script "prerm" "pre-deinstall"
+    map_script "postrm" "post-deinstall"
+
+    # build post-upgrade script
+    local upgrade_script="$tmp_dir/post-upgrade"
+    cat <<EOF > "$upgrade_script"
+#!/bin/sh
+export PKG_UPGRADE=1
+[ "\${IPKG_NO_SCRIPT}" = "1" ] && exit 0
+[ -s \${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
+. \${IPKG_INSTROOT}/lib/functions.sh
+export root="\${IPKG_INSTROOT}"
+export pkgname="$pkg_name"
+add_group_and_user
+default_postinst
+EOF
+    chmod +x "$upgrade_script"
+    script_args="$script_args --script post-upgrade:$upgrade_script"
+
+    # run apk mkpkg
+    local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
+    
+    "$APK_TOOL" mkpkg \
+        --info "name:$pkg_name" \
+        --info "version:$pkg_version" \
+        --info "description:$pkg_desc" \
+        --info "arch:$pkg_arch" \
+        --info "license:$pkg_license" \
+        --info "origin:$pkg_origin" \
+        --info "url:$pkg_url" \
+        --info "maintainer:$pkg_maintainer" \
+        --info "provides:$pkg_provides" \
+        --info "depends:$pkg_deps" \
+        $script_args \
+        --files "$(readlink -f data_dir)" \
+        --output "$output_apk"
+
+    popd > /dev/null
+    rm -rf "$tmp_dir"
+    
+    [ -f "$output_apk" ] && echo "Done: $(basename "$output_apk")" || echo "Error: Failed to build $pkg_name"
+}
+
+[ "$#" -eq 0 ] && { show_help; exit 0; }
+
+if [ "$#" -eq 1 ]; then
+    convert_one_ipk "$1" "$(pwd)"
+elif [ "$#" -eq 2 ] && [[ "$1" == *.ipk ]] && [[ ! "$2" == *.ipk ]]; then
+    convert_one_ipk "$1" "$2"
+else
+    for file in "$@"; do
+        if [[ "$file" == *.ipk ]]; then
+            convert_one_ipk "$file" "$(pwd)"
+        else
+            echo "Skip: $file (not an ipk)"
+        fi
+    done
+fi
