@@ -1,6 +1,6 @@
 # ipk2apk
 
-`ipk2apk` 是一个用于将传统 OpenWrt 的 `.ipk` (opkg) 格式软件包转换为新版的 `.apk` (APKND) 格式的工具。
+`ipk2apk` 是一个用于将传统 OpenWrt 的 `.ipk` (opkg) 格式软件包转换为新版的 `.apk` (APKv3) 格式的工具。
 
 ### 主要功能
 
