@@ -18,6 +18,26 @@ Arguments:
 EOF
 }
 
+fix_version() {
+    local ver="$1"
+    local main_ver=""
+    local revision="0"
+
+    if [[ "$ver" =~ -([0-9]+)$ ]]; then
+        revision="${BASH_REMATCH[1]}"
+        main_ver="${ver%-$revision}"
+    else
+        main_ver="$ver"
+    fi
+
+    main_ver=$(echo "$main_ver" | sed 's/[^0-9]/./g')
+    main_ver=$(echo "$main_ver" | sed -E 's/\.+/./g; s/^\.+//; s/\.+$//')
+
+    [ -z "$main_ver" ] && main_ver="0"
+
+    echo "${main_ver}-r${revision}"
+}
+
 convert_one_ipk() {
     local ipk_input="$1"
     local output_dir="$2"
@@ -54,7 +74,9 @@ convert_one_ipk() {
     }
 
     local pkg_name=$(get_metadata "Package")
-    local pkg_version=$(get_metadata "Version")
+    local raw_version=$(get_metadata "Version")
+    local pkg_version=$(fix_version "$raw_version")
+
     local pkg_arch=$(get_metadata "Architecture")
     local pkg_license=$(get_metadata "License")
     local pkg_origin=$(get_metadata "Source")
