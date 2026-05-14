@@ -30,7 +30,7 @@ fix_version() {
         main_ver="$ver"
     fi
 
-    main_ver=$(echo "$main_ver" | sed 's/[^0-9]/./g')
+    main_ver=$(echo "$main_ver" | sed 's/[^0-9~.]/./g')
     main_ver=$(echo "$main_ver" | sed -E 's/\.+/./g; s/^\.+//; s/\.+$//')
 
     [ -z "$main_ver" ] && main_ver="0"
