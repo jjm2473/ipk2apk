@@ -78,6 +78,7 @@ convert_one_ipk() {
     local pkg_version=$(fix_version "$raw_version")
 
     local pkg_arch=$(get_metadata "Architecture")
+    [ "$pkg_arch" = "all" ] && pkg_arch="noarch"
     local pkg_license=$(get_metadata "License")
     local pkg_origin=$(get_metadata "Source")
     local pkg_url=$(get_metadata "URL")
