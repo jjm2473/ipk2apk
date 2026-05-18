@@ -4,9 +4,9 @@
 
 ### 主要功能
 
-- 元数据映射：提取 IPK `control` 文件中的字段（包名、版本、依赖、架构、描述等）并转换为 APK 规范
-- 脚本转换：处理 `preinst`、`postinst`、`prerm` 和 `postrm` 脚本
-- 升级兼容：注入 `post-upgrade` 逻辑，确保软件包在升级过程中保持正确的行为
+- 元数据映射：提取 IPK `control` 文件中的字段（包名、版本、依赖、架构、描述等）并转换为 APK 规范，支持解析 `Require-User` 生成 `.rusers`，兼容 `-rN` 版本号后缀
+- 脚本重建：模拟 OpenWrt 构建系统逻辑，将 `postinst-pkg` / `prerm-pkg` 等包内逻辑代码与系统级脚本外壳拼接，生成 `post-install`、`pre-upgrade`、`post-upgrade` 和 `pre-deinstall` 生命周期脚本
+- 配置保留：提取和解析 `conffiles` 配置文件列表，并生成相应的 `.conffiles_static`（包含文件的 SHA256 校验和），用于在升级时保留用户配置
 - 列表生成：扫描安装文件并在包内生成 `/lib/apk/packages/<name>.list` 以符合 APK 包规范
 - 批量处理：支持单文件转换及通配符、多文件输入批量操作
 
