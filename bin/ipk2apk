@@ -23,9 +23,9 @@ fix_version() {
     local main_ver=""
     local revision="0"
 
-    if [[ "$ver" =~ -([0-9]+)$ ]]; then
+    if [[ "$ver" =~ -r?([0-9]+)$ ]]; then
         revision="${BASH_REMATCH[1]}"
-        main_ver="${ver%-$revision}"
+        main_ver="${ver%${BASH_REMATCH[0]}}"
     else
         main_ver="$ver"
     fi
