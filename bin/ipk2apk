@@ -86,6 +86,7 @@ convert_one_ipk() {
     local pkg_deps=$(get_metadata "Depends" | sed 's/,/ /g')
     local pkg_provides=$(get_metadata "Provides")
     [ -z "$pkg_provides" ] && pkg_provides="${pkg_name}-any"
+    local pkg_require_user=$(get_metadata "Require-User")
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
     [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
@@ -104,25 +105,35 @@ convert_one_ipk() {
     mkdir -p "$list_target_dir"
     mv "$raw_list" "$list_target_dir/${pkg_name}.list"
 
+    if [ -n "$pkg_require_user" ]; then
+        echo "$pkg_require_user" > "$list_target_dir/${pkg_name}.rusers"
+    fi
+
+    # process conffiles
+    if [ -f "control_dir/conffiles" ]; then
+        cp "control_dir/conffiles" "$list_target_dir/${pkg_name}.conffiles"
+        for cfile in $(cat "control_dir/conffiles"); do
+            local cfile_rel="${cfile#/}"
+            if [ -f "data_dir/$cfile_rel" ]; then
+                local csum=$(sha256sum "data_dir/$cfile_rel" | awk '{print $1}')
+                echo "$cfile $csum" >> "$list_target_dir/${pkg_name}.conffiles_static"
+            fi
+        done
+    fi
+
     # maintenance scripts mapping
     local script_args=""
-    map_script() {
-        if [ -f "control_dir/$1" ]; then
-            chmod +x "control_dir/$1"
-            script_args="$script_args --script $2:$(readlink -f "control_dir/$1")"
+    add_script() {
+        if [ -f "$2" ]; then
+            chmod +x "$2"
+            script_args="$script_args --script $1:$(readlink -f "$2")"
         fi
     }
 
-    map_script "preinst" "pre-install"
-    map_script "postinst" "post-install"
-    map_script "prerm" "pre-deinstall"
-    map_script "postrm" "post-deinstall"
-
-    # build post-upgrade script
-    local upgrade_script="$tmp_dir/post-upgrade"
-    cat <<EOF > "$upgrade_script"
+    # post-install
+    local post_install_script="$tmp_dir/post-install"
+    cat <<EOF > "$post_install_script"
 #!/bin/sh
-export PKG_UPGRADE=1
 [ "\${IPKG_NO_SCRIPT}" = "1" ] && exit 0
 [ -s \${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
 . \${IPKG_INSTROOT}/lib/functions.sh
@@ -131,8 +142,53 @@ export pkgname="$pkg_name"
 add_group_and_user
 default_postinst
 EOF
-    chmod +x "$upgrade_script"
-    script_args="$script_args --script post-upgrade:$upgrade_script"
+    if [ -f "control_dir/postinst-pkg" ]; then
+        sed '/^\s*#!/d' "control_dir/postinst-pkg" >> "$post_install_script"
+    elif [ -f "control_dir/postinst" ] && ! grep -q "default_postinst" "control_dir/postinst"; then
+        sed '/^\s*#!/d' "control_dir/postinst" >> "$post_install_script"
+    fi
+    add_script "post-install" "$post_install_script"
+
+    # pre-upgrade (and pre-install)
+    if [ -f "control_dir/preinst" ]; then
+        local pre_upgrade_script="$tmp_dir/pre-upgrade"
+        echo "#!/bin/sh" > "$pre_upgrade_script"
+        echo "export PKG_UPGRADE=1" >> "$pre_upgrade_script"
+        sed '/^\s*#!/d' "control_dir/preinst" >> "$pre_upgrade_script"
+        add_script "pre-upgrade" "$pre_upgrade_script"
+        add_script "pre-install" "control_dir/preinst"
+    fi
+
+    # post-upgrade
+    local post_upgrade_script="$tmp_dir/post-upgrade"
+    echo "#!/bin/sh" > "$post_upgrade_script"
+    echo "export PKG_UPGRADE=1" >> "$post_upgrade_script"
+    sed '/^\s*#!/d' "$post_install_script" >> "$post_upgrade_script"
+    add_script "post-upgrade" "$post_upgrade_script"
+
+    # pre-deinstall
+    local pre_deinstall_script="$tmp_dir/pre-deinstall"
+    cat <<EOF > "$pre_deinstall_script"
+#!/bin/sh
+[ "\${IPKG_NO_SCRIPT}" = "1" ] && exit 0
+[ -s \${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
+. \${IPKG_INSTROOT}/lib/functions.sh
+export root="\${IPKG_INSTROOT}"
+export pkgname="$pkg_name"
+default_prerm
+EOF
+    if [ -f "control_dir/prerm-pkg" ]; then
+        sed '/^\s*#!/d' "control_dir/prerm-pkg" >> "$pre_deinstall_script"
+    elif [ -f "control_dir/prerm" ] && ! grep -q "default_prerm" "control_dir/prerm"; then
+        sed '/^\s*#!/d' "control_dir/prerm" >> "$pre_deinstall_script"
+    fi
+    add_script "pre-deinstall" "$pre_deinstall_script"
+
+    # post-deinstall
+    if [ -f "control_dir/postrm" ]; then
+        sed -zi 's/^\s*#!/#!/' "control_dir/postrm" 2>/dev/null || true
+        add_script "post-deinstall" "control_dir/postrm"
+    fi
 
     # run apk mkpkg
     local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
