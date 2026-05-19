@@ -30,7 +30,7 @@ fix_version() {
         main_ver="$ver"
     fi
 
-    main_ver=$(echo "$main_ver" | sed 's/[^0-9~.]/./g')
+    main_ver=$(echo "$main_ver" | sed 's/[^a-zA-Z0-9~._+]/./g')
     main_ver=$(echo "$main_ver" | sed -E 's/\.+/./g; s/^\.+//; s/\.+$//')
 
     [ -z "$main_ver" ] && main_ver="0"
@@ -84,9 +84,18 @@ convert_one_ipk() {
     local pkg_url=$(get_metadata "URL")
     local pkg_maintainer=$(get_metadata "Maintainer")
     local pkg_deps=$(get_metadata "Depends" | sed 's/,/ /g')
-    local pkg_provides=$(get_metadata "Provides")
-    [ -z "$pkg_provides" ] && pkg_provides="${pkg_name}-any"
+    local pkg_provides=$(get_metadata "Provides" | sed 's/,/ /g')
+    if [ -n "$pkg_provides" ]; then
+        local provs=""
+        for p in $pkg_provides; do
+            provs="$provs $p ${p}-any"
+        done
+        pkg_provides="${provs# }"
+    else
+        pkg_provides="${pkg_name}-any"
+    fi
     local pkg_require_user=$(get_metadata "Require-User")
+    local pkg_abi_version=$(get_metadata "ABIVersion")
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
     [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
@@ -192,7 +201,12 @@ EOF
 
     # run apk mkpkg
     local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
-    
+
+    local extra_args=()
+    if [ -n "$pkg_abi_version" ]; then
+        extra_args+=(--info "tags:openwrt:abiversion=$pkg_abi_version")
+    fi
+
     "$APK_TOOL" mkpkg \
         --info "name:$pkg_name" \
         --info "version:$pkg_version" \
@@ -204,6 +218,7 @@ EOF
         --info "maintainer:$pkg_maintainer" \
         --info "provides:$pkg_provides" \
         --info "depends:$pkg_deps" \
+        "${extra_args[@]}" \
         $script_args \
         --files "$(readlink -f data_dir)" \
         --output "$output_apk"
