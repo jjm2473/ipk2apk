@@ -96,6 +96,7 @@ convert_one_ipk() {
     fi
     local pkg_require_user=$(get_metadata "Require-User")
     local pkg_abi_version=$(get_metadata "ABIVersion")
+    local pkg_cpe_id=$(get_metadata "CPE-ID")
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
     [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
@@ -205,6 +206,10 @@ EOF
     local extra_args=()
     if [ -n "$pkg_abi_version" ]; then
         extra_args+=(--info "tags:openwrt:abiversion=$pkg_abi_version")
+    fi
+
+    if [ -n "$pkg_cpe_id" ]; then
+        extra_args+=(--info "tags:openwrt:cpe=$pkg_cpe_id")
     fi
 
     "$APK_TOOL" mkpkg \
