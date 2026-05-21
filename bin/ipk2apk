@@ -83,19 +83,13 @@ convert_one_ipk() {
     local pkg_origin=$(get_metadata "Source")
     local pkg_url=$(get_metadata "URL")
     local pkg_maintainer=$(get_metadata "Maintainer")
-    local pkg_deps=$(get_metadata "Depends" | sed 's/,/ /g')
-    local pkg_provides=$(get_metadata "Provides" | sed 's/,/ /g')
-    if [ -n "$pkg_provides" ]; then
-        local provs=""
-        for p in $pkg_provides; do
-            provs="$provs $p ${p}-any"
-        done
-        pkg_provides="${provs# }"
-    else
-        pkg_provides="${pkg_name}-any"
-    fi
-    local pkg_require_user=$(get_metadata "Require-User")
+    local pkg_deps=$(get_metadata "Depends" | sed 's/, */ /g')
     local pkg_abi_version=$(get_metadata "ABIVersion")
+    local pkg_provides=$(get_metadata "Provides" | sed 's/, */ /g')
+    pkg_provides="$pkg_provides ${pkg_name%$pkg_abi_version}-any"
+    pkg_provides="${pkg_provides# }"
+    local pkg_require_user=$(get_metadata "Require-User")
+
     local pkg_cpe_id=$(get_metadata "CPE-ID")
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
