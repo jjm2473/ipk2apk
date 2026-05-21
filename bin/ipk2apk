@@ -91,6 +91,7 @@ convert_one_ipk() {
     local pkg_require_user=$(get_metadata "Require-User")
 
     local pkg_cpe_id=$(get_metadata "CPE-ID")
+    local pkg_alternatives=$(get_metadata "Alternatives" | sed 's/, */ /g')
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | grep -v ":" | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
     [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
@@ -111,6 +112,10 @@ convert_one_ipk() {
 
     if [ -n "$pkg_require_user" ]; then
         echo "$pkg_require_user" > "$list_target_dir/${pkg_name}.rusers"
+    fi
+
+    if [ -n "$pkg_alternatives" ]; then
+        echo "$pkg_alternatives" > "$list_target_dir/${pkg_name}.alternatives"
     fi
 
     # process conffiles
