@@ -26,8 +26,8 @@ script_dir() {
 }
 
 fallback_to_docker_if_needed() {
-	[ -z "$(which apk)" ] || return 0
-	echo "apk command not found in PATH, fallback to docker apk command"
+	[ -z "$(which apk)" -o -z "$(which fakeroot)" ] || return 0
+	echo "apk or fakeroot command not found in PATH, fallback to docker"
 	local docker_fake_root="$(readlink -f "$(script_dir)/../docker")"
 	"$docker_fake_root/init.sh" "$1" || { echo "docker fallback path failed!"; exit 1; }
 	export PATH="$docker_fake_root/bin:$PATH"
