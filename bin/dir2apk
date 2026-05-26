@@ -14,10 +14,31 @@ Arguments:
 EOF
 }
 
+script_dir() {
+	local src="$0"
+	if [[ "$src" == */* ]]; then
+		:
+	else
+		src="$(which "$src")"
+		[ -z "$src" ] && { echo "Error: $src not found in PATH" >&2; exit 1; }
+	fi
+	echo "$(dirname "$(readlink -f "$src")")"
+}
+
+fallback_to_docker_if_needed() {
+	[ -z "$(which apk)" ] || return 0
+	echo "apk command not found in PATH, fallback to docker apk command"
+	local docker_fake_root="$(readlink -f "$(script_dir)/../docker")"
+	"$docker_fake_root/init.sh" "$1" || { echo "docker fallback path failed!"; exit 1; }
+	export PATH="$docker_fake_root/bin:$PATH"
+}
+
 convert_one_dir() {
 	local input_dir="${1%/}"
 	local output_dir="${2%/}"
 	[ ! -d "$input_dir" ] && { echo "Error: $input_dir not found"; return 1; }
+
+	fallback_to_docker_if_needed "$output_dir"
 
 	local ipk_file rel_path target_dir
 	# find all .ipk files and convert them, reserve directory structure

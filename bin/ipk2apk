@@ -1,12 +1,5 @@
 #!/bin/bash
 
-APK_TOOL="$(which apk)"
-
-if [ ! -f "$APK_TOOL" ]; then
-    echo -e "\nThe apk command is not installed.\n"
-    exit 1
-fi
-
 show_help() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS] <FILE.ipk>... [OUTPUT_DIR]
@@ -211,7 +204,7 @@ EOF
         extra_args+=(--info "tags:openwrt:cpe=$pkg_cpe_id")
     fi
 
-    "$APK_TOOL" mkpkg \
+    apk mkpkg \
         --info "name:$pkg_name" \
         --info "version:$pkg_version" \
         --info "description:$pkg_desc" \
@@ -233,13 +226,35 @@ EOF
     [ -f "$output_apk" ] && echo "Done: $(basename "$output_apk")" || echo "Error: Failed to build $pkg_name"
 }
 
+script_dir() {
+	local src="$0"
+	if [[ "$src" == */* ]]; then
+		:
+	else
+		src="$(which "$src")"
+		[ -z "$src" ] && { echo "Error: $src not found in PATH" >&2; exit 1; }
+	fi
+	echo "$(dirname "$(readlink -f "$src")")"
+}
+
+fallback_to_docker_if_needed() {
+	[ -z "$(which apk)" ] || return 0
+	echo "apk command not found in PATH, fallback to docker apk command"
+	local docker_fake_root="$(readlink -f "$(script_dir)/../docker")"
+	"$docker_fake_root/init.sh" "$1" || { echo "docker fallback path failed!"; exit 1; }
+	export PATH="$docker_fake_root/bin:$PATH"
+}
+
 [ "$#" -eq 0 ] && { show_help; exit 0; }
 
 if [ "$#" -eq 1 ]; then
+    fallback_to_docker_if_needed "$(pwd)"
     convert_one_ipk "$1" "$(pwd)"
 elif [ "$#" -eq 2 ] && [[ "$1" == *.ipk ]] && [[ ! "$2" == *.ipk ]]; then
+    fallback_to_docker_if_needed "$2"
     convert_one_ipk "$1" "$2"
 else
+    fallback_to_docker_if_needed "$(pwd)"
     for file in "$@"; do
         if [[ "$file" == *.ipk ]]; then
             convert_one_ipk "$file" "$(pwd)"

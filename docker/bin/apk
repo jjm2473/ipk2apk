@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# exec apk command in alpine container, with fakeroot
+docker exec -u 0:0 openwrt-apk-builder apk "$@"
