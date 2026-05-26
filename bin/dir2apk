@@ -1,0 +1,39 @@
+#!/bin/bash
+
+IPK2APK=ipk2apk
+[ -n "$(which ipk2apk)" ] || IPK2APK="$(dirname "$0")/ipk2apk"
+
+show_help() {
+	cat << EOF
+Usage: $(basename "$0") <IPK_DIR> [OUTPUT_DIR]
+
+Arguments:
+  <IPK_DIR>          Directory containing .ipk files to be converted.
+  [OUTPUT_DIR]       Target directory for .apk files (default: current dir).
+
+EOF
+}
+
+convert_one_dir() {
+	local input_dir="${1%/}"
+	local output_dir="${2%/}"
+	[ ! -d "$input_dir" ] && { echo "Error: $input_dir not found"; return 1; }
+
+	local ipk_file rel_path target_dir
+	# find all .ipk files and convert them, reserve directory structure
+	find "$input_dir" -type f -name "*.ipk" | while read; do
+		ipk_file="$REPLY"
+		rel_path="${ipk_file#$input_dir/}"
+		target_dir="$output_dir/$(dirname "$rel_path")"
+		mkdir -p "$target_dir"
+		"$IPK2APK" "$ipk_file" "$target_dir"
+	done
+}
+
+[ "$#" -ne 1 ] && [ "$#" -ne 2 ] && { show_help; exit 0; }
+
+if [ "$#" -eq 1 ]; then
+	convert_one_dir "$1" "$(pwd)"
+else
+	convert_one_dir "$1" "$2"
+fi
