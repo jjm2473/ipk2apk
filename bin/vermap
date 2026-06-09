@@ -39,7 +39,7 @@ vermap_file="$(script_dir)/../data/vermap.tsv"
 if [[ unknown == "$srcver" ]]; then
 	apkver="0.0.1"
 else
-	apkver=$(grep -Fw "$srcver" "$vermap_file" | cut -d"$TAB" -f2)
+	apkver=$(grep -Fwm1 "$srcver$TAB" "$vermap_file" | cut -d"$TAB" -f2)
 fi
 
 if [ -n "$apkver" ]; then
