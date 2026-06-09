@@ -1,0 +1,32 @@
+#!/bin/bash
+
+script_dir() {
+	local src="$0"
+	if [[ "$src" == */* ]]; then
+		:
+	else
+		src="$(which "$src")"
+		[ -z "$src" ] && { echo "Error: $src not found in PATH" >&2; exit 1; }
+	fi
+	echo "$(dirname "$(readlink -f "$src")")"
+}
+
+VERMAP="$(script_dir)/../bin/vermap"
+
+> "$(script_dir)/mapped_versions.txt"
+> "$(script_dir)/unmapped_versions.txt"
+
+cut -d',' -f2 "$(script_dir)/versions.csv" | while read; do
+	ver="$REPLY"
+	[[ -z "$ver" ]] && continue
+	apkver="$("$VERMAP" "$ver")"
+	if [[ -n "$apkver" ]]; then
+		echo "$ver -> $apkver" >> "$(script_dir)/mapped_versions.txt"
+	else
+		echo "$ver" >> "$(script_dir)/unmapped_versions.txt"
+	fi
+done
+
+sort -u "$(script_dir)/mapped_versions.txt" -o "$(script_dir)/mapped_versions.txt"
+sort -u "$(script_dir)/unmapped_versions.txt" -o "$(script_dir)/unmapped_versions.txt"
+

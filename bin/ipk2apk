@@ -11,24 +11,9 @@ Arguments:
 EOF
 }
 
+VERMAP=
 fix_version() {
-    local ver="$1"
-    local main_ver=""
-    local revision="0"
-
-    if [[ "$ver" =~ -r?([0-9]+)$ ]]; then
-        revision="${BASH_REMATCH[1]}"
-        main_ver="${ver%${BASH_REMATCH[0]}}"
-    else
-        main_ver="$ver"
-    fi
-
-    main_ver=$(echo "$main_ver" | sed 's/[^a-zA-Z0-9~._+]/./g')
-    main_ver=$(echo "$main_ver" | sed -E 's/\.+/./g; s/^\.+//; s/\.+$//')
-
-    [ -z "$main_ver" ] && main_ver="0"
-
-    echo "${main_ver}-r${revision}"
+    "$VERMAP" "$1"
 }
 
 convert_one_ipk() {
@@ -72,6 +57,7 @@ convert_one_ipk() {
 
     local pkg_arch=$(get_metadata "Architecture")
     [ "$pkg_arch" = "all" ] && pkg_arch="noarch"
+    [ "$pkg_arch" = "aarch64_cortex-a53" ] && pkg_arch="aarch64_generic"
     local pkg_license=$(get_metadata "License")
     local pkg_origin=$(get_metadata "Source")
     local pkg_url=$(get_metadata "URL")
@@ -246,6 +232,8 @@ fallback_to_docker_if_needed() {
 }
 
 [ "$#" -eq 0 ] && { show_help; exit 0; }
+
+VERMAP="$(script_dir)/vermap"
 
 if [ "$#" -eq 1 ]; then
     fallback_to_docker_if_needed "$(pwd)"
