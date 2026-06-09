@@ -76,7 +76,7 @@ convert_one_ipk() {
     local pkg_origin=$(get_metadata "Source")
     local pkg_url=$(get_metadata "URL")
     local pkg_maintainer=$(get_metadata "Maintainer")
-    local pkg_deps=$(get_metadata "Depends" | sed 's/, */ /g')
+    local pkg_deps=$(get_metadata "Depends" | sed -e 's/ (//g' -e 's/)//g' -e 's/, */ /g')
     local pkg_abi_version=$(get_metadata "ABIVersion")
     local pkg_provides=$(get_metadata "Provides" | sed 's/, */ /g')
     pkg_provides="$pkg_provides ${pkg_name%$pkg_abi_version}-any"
