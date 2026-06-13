@@ -31,15 +31,14 @@ convert_one_ipk() {
 
     pushd "$tmp_dir" > /dev/null || return 1
 
-    # unpack ipk
-    tar -xf "$abs_ipk" || { 
+    # metadata
+    tar -xf "$abs_ipk" ./control.tar.gz || { 
         echo "Error: Failed to extract $(basename "$abs_ipk")"
         popd > /dev/null; rm -rf "$tmp_dir"; return 1 
     }
 
-    mkdir -p control_dir data_dir
-    [ -f "control.tar.gz" ] && tar -xzf control.tar.gz -C control_dir
-    [ -f "data.tar.gz" ] && tar -xzf data.tar.gz -C data_dir
+    mkdir -p control_dir
+    tar -xzf control.tar.gz -C control_dir
 
     local control_file="control_dir/control"
     [ ! -f "$control_file" ] && { 
@@ -74,6 +73,13 @@ convert_one_ipk() {
 
     local pkg_desc=$(sed -n '/^Description:/,/^[A-Z][a-zA-Z-]*:/p' "$control_file" | sed 's/^Description: *//')
     [ -z "$pkg_desc" ] && pkg_desc=$(get_metadata "Description")
+
+    local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
+
+    # data
+    mkdir -p data_dir
+    tar -xf "$abs_ipk" ./data.tar.gz || true
+    [ -f "data.tar.gz" ] && tar -xzf data.tar.gz -C data_dir
 
     # generate .list for apk package
     local raw_list="$tmp_dir/files.list.txt"
@@ -179,8 +185,6 @@ EOF
     fi
 
     # run apk mkpkg
-    local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
-
     local extra_args=()
     if [ -n "$pkg_abi_version" ]; then
         extra_args+=(--info "tags:openwrt:abiversion=$pkg_abi_version")
