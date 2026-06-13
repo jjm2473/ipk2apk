@@ -76,6 +76,11 @@ convert_one_ipk() {
 
     local output_apk="${abs_output_dir}/${pkg_name}-${pkg_version}.apk"
 
+    if [ -n "$IPK2APK_SKIP_EXISTING" -a -f "$output_apk" ]; then
+        echo "Skip: $output_apk already exists"
+        popd > /dev/null; rm -rf "$tmp_dir"; return 0
+    fi
+
     # data
     mkdir -p data_dir
     tar -xf "$abs_ipk" ./data.tar.gz || true
