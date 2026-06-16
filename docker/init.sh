@@ -33,8 +33,17 @@ fi
 
 docker rm -f openwrt-apk-builder > /dev/null 2>&1 || true
 
-docker run -d --name openwrt-apk-builder \
-	-v "${TMP_DIR}:${TMP_DIR}:ro" \
-	-v "${OUTPUT_DIR}:${OUTPUT_DIR}:rw" \
+docker_run_args=(
+	-d --name openwrt-apk-builder
+)
+
+# Mount /tmp first when needed; then mount OUTPUT_DIR as rw to override nested paths.
+if [ "$TMP_DIR" != "$OUTPUT_DIR" ]; then
+	docker_run_args+=( -v "${TMP_DIR}:${TMP_DIR}:ro" )
+fi
+
+docker_run_args+=( -v "${OUTPUT_DIR}:${OUTPUT_DIR}:rw" )
+
+docker run "${docker_run_args[@]}" \
 	alpine:3.23 \
 	tail -f /dev/null
