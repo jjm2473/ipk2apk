@@ -12,25 +12,14 @@
 
 ### 环境要求
 
-脚本依赖 `apk-tools` 提供的 `apk` 命令行工具进行打包。
-
-- 如果你的系统尚未安装 `apk` 命令，可以下载适用于 x86_64 的静态构建版本：
-  
-  下载地址：[https://github.com/sbwml/apk-tools/releases](https://github.com/sbwml/apk-tools/releases)
-  
-- 安装建议：下载后将 `apk` 放置在 `/usr/bin/` 或其他系统 `PATH` 路径下，并赋予执行权限：
-  
-  ```bash
-  chmod +x /usr/bin/apk
-  ```
+满足以下条件**之一**即可：
+1. 系统中有可用的 `apk` 和 `fakeroot` 命令，并能直接在 shell 中调用
+2. 系统中有本地的 Docker 环境，且 `docker` 命令能被直接调用
 
 ### 脚本使用
 
-下载脚本并添加执行权限：
-
-```bash
-chmod +x ipk2apk
-```
+1. 拉取项目
+2. 将 bin 路径添加到 PATH 环境变量；或进入 bin 目录执行 `./ipk2apk`
 
 #### 转换单个 IPK 文件
 
